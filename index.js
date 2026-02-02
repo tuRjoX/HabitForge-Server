@@ -41,6 +41,45 @@ async function run() {
     const habitsCollection = database.collection("habits");
     const usersCollection = database.collection("users");
 
+    // ============ USER ROUTES ============
+
+    // Save or update user on login/register
+    app.post("/api/users", async (req, res) => {
+      try {
+        const user = req.body;
+        const query = { email: user.email };
+        const options = { upsert: true };
+        const updateDoc = {
+          $set: {
+            ...user,
+            lastLogin: new Date(),
+          },
+          $setOnInsert: {
+            createdAt: new Date(),
+          },
+        };
+        const result = await usersCollection.updateOne(
+          query,
+          updateDoc,
+          options,
+        );
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({ error: error.message });
+      }
+    });
+
+    // Get user by email
+    app.get("/api/users/:email", async (req, res) => {
+      try {
+        const email = req.params.email;
+        const user = await usersCollection.findOne({ email });
+        res.send(user || {});
+      } catch (error) {
+        res.status(500).send({ error: error.message });
+      }
+    });
+
     // Root route
     app.get("/", (req, res) => {
       res.send("HabitForge Server is running!");
