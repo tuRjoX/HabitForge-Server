@@ -18,7 +18,7 @@ app.use(
       "https://habitforge-tracker.firebaseapp.com",
     ],
     credentials: true,
-  })
+  }),
 );
 app.use(express.json());
 
@@ -224,7 +224,7 @@ app.put("/api/habits/:id", async (req, res) => {
 
     const result = await habitsCollection.updateOne(
       { _id: new ObjectId(id) },
-      { $set: updatedHabit }
+      { $set: updatedHabit },
     );
     res.send(result);
   } catch (error) {
@@ -265,7 +265,7 @@ app.patch("/api/habits/:id/complete", async (req, res) => {
     }
 
     const completionDates = habit.completionHistory.map(
-      (date) => new Date(date).toISOString().split("T")[0]
+      (date) => new Date(date).toISOString().split("T")[0],
     );
 
     if (completionDates.includes(todayStr)) {
@@ -295,7 +295,7 @@ app.patch("/api/habits/:id/complete", async (req, res) => {
           longestStreak: longestStreak,
           lastCompleted: new Date(),
         },
-      }
+      },
     );
 
     res.send({
@@ -325,7 +325,7 @@ app.get("/api/habits/:id/stats", async (req, res) => {
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     const completionsLast30 = habit.completionHistory.filter(
-      (date) => new Date(date) >= thirtyDaysAgo
+      (date) => new Date(date) >= thirtyDaysAgo,
     ).length;
 
     const completionPercentage = Math.round((completionsLast30 / 30) * 100);
@@ -352,22 +352,20 @@ app.get("/api/stats/:email", async (req, res) => {
     const habitsCollection = db.collection("habits");
 
     const email = req.params.email;
-    const habits = await habitsCollection
-      .find({ userEmail: email })
-      .toArray();
+    const habits = await habitsCollection.find({ userEmail: email }).toArray();
 
     const totalHabits = habits.length;
     const totalCompletions = habits.reduce(
       (sum, h) => sum + (h.completionHistory?.length || 0),
-      0
+      0,
     );
     const currentStreaks = habits.reduce(
       (sum, h) => sum + (h.currentStreak || 0),
-      0
+      0,
     );
     const longestStreak = Math.max(
       ...habits.map((h) => h.longestStreak || 0),
-      0
+      0,
     );
 
     const weekAgo = new Date();
@@ -375,7 +373,7 @@ app.get("/api/stats/:email", async (req, res) => {
 
     const weeklyCompletions = habits.reduce((sum, h) => {
       const recent = (h.completionHistory || []).filter(
-        (date) => new Date(date) >= weekAgo
+        (date) => new Date(date) >= weekAgo,
       );
       return sum + recent.length;
     }, 0);
