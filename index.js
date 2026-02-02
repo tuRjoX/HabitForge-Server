@@ -178,7 +178,7 @@ async function run() {
       try {
         const id = req.params.id;
         const updatedHabit = req.body;
-        delete updatedHabit._id; // Remove _id from update
+        delete updatedHabit._id;
         updatedHabit.updatedAt = new Date();
 
         const result = await habitsCollection.updateOne(
@@ -199,6 +199,145 @@ async function run() {
           _id: new ObjectId(id),
         });
         res.send(result);
+      } catch (error) {
+        res.status(500).send({ error: error.message });
+      }
+    });
+
+    // Mark habit as complete
+    app.patch("/api/habits/:id/complete", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const todayStr = today.toISOString().split("T")[0];
+
+        const habit = await habitsCollection.findOne({ _id: new ObjectId(id) });
+        if (!habit) {
+          return res.status(404).send({ error: "Habit not found" });
+        }
+
+        const completionDates = habit.completionHistory.map(
+          (date) => new Date(date).toISOString().split("T")[0],
+        );
+
+        if (completionDates.includes(todayStr)) {
+          return res
+            .status(400)
+            .send({ error: "Habit already completed today" });
+        }
+
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = yesterday.toISOString().split("T")[0];
+
+        let newStreak = habit.currentStreak || 0;
+
+        if (completionDates.includes(yesterdayStr)) {
+          newStreak += 1;
+        } else {
+          newStreak = 1;
+        }
+
+        const longestStreak = Math.max(newStreak, habit.longestStreak || 0);
+
+        const result = await habitsCollection.updateOne(
+          { _id: new ObjectId(id) },
+          {
+            $push: { completionHistory: new Date() },
+            $set: {
+              currentStreak: newStreak,
+              longestStreak: longestStreak,
+              lastCompleted: new Date(),
+            },
+          },
+        );
+
+        res.send({
+          ...result,
+          currentStreak: newStreak,
+          longestStreak: longestStreak,
+        });
+      } catch (error) {
+        res.status(500).send({ error: error.message });
+      }
+    });
+
+    // Get habit statistics
+    app.get("/api/habits/:id/stats", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const habit = await habitsCollection.findOne({ _id: new ObjectId(id) });
+
+        if (!habit) {
+          return res.status(404).send({ error: "Habit not found" });
+        }
+
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+        const completionsLast30 = habit.completionHistory.filter(
+          (date) => new Date(date) >= thirtyDaysAgo,
+        ).length;
+
+        const completionPercentage = Math.round((completionsLast30 / 30) * 100);
+
+        res.send({
+          currentStreak: habit.currentStreak || 0,
+          longestStreak: habit.longestStreak || 0,
+          totalCompletions: habit.completionHistory.length,
+          completionsLast30Days: completionsLast30,
+          completionPercentage: completionPercentage,
+          lastCompleted: habit.lastCompleted,
+        });
+      } catch (error) {
+        res.status(500).send({ error: error.message });
+      }
+    });
+
+    // ============ STATS ROUTES ============
+
+    // Get user stats
+    app.get("/api/stats/:email", async (req, res) => {
+      try {
+        const email = req.params.email;
+        const habits = await habitsCollection
+          .find({ userEmail: email })
+          .toArray();
+
+        const totalHabits = habits.length;
+        const totalCompletions = habits.reduce(
+          (sum, h) => sum + (h.completionHistory?.length || 0),
+          0,
+        );
+        const currentStreaks = habits.reduce(
+          (sum, h) => sum + (h.currentStreak || 0),
+          0,
+        );
+        const longestStreak = Math.max(
+          ...habits.map((h) => h.longestStreak || 0),
+          0,
+        );
+
+        const weekAgo = new Date();
+        weekAgo.setDate(weekAgo.getDate() - 7);
+
+        const weeklyCompletions = habits.reduce((sum, h) => {
+          const recent = (h.completionHistory || []).filter(
+            (date) => new Date(date) >= weekAgo,
+          );
+          return sum + recent.length;
+        }, 0);
+
+        res.send({
+          totalHabits,
+          totalCompletions,
+          currentStreaks,
+          longestStreak,
+          weeklyCompletions,
+          averageStreak:
+            totalHabits > 0 ? Math.round(currentStreaks / totalHabits) : 0,
+        });
       } catch (error) {
         res.status(500).send({ error: error.message });
       }
