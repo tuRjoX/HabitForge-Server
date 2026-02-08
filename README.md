@@ -2,6 +2,11 @@
 
 Backend API server for HabitForge - Daily Habit Tracker application.
 
+# Live Link
+
+**[Sever Link](https://habit-forge-server.vercel.app)**
+
+
 ## Setup
 
 1. Clone the repository
